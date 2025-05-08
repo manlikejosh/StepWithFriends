@@ -1,39 +1,58 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
-import 'react-native-reanimated';
-
-import { useColorScheme } from '@/hooks/useColorScheme';
-
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
+import { Stack, useRouter, useSegments } from "expo-router";
+import { useEffect } from "react";
+import { supabase } from "./utils/supabase";
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const [loaded] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
+  const router = useRouter();
+  const segments = useSegments();
 
   useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
+    // Check for active session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      
+      // if there is no session, go to login screen
+      if (!session) {
+        router.replace("/Login");
+      }
+    });
 
-  if (!loaded) {
-    return null;
-  }
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const isLoginScreen = segments[0] === "Login";
+      
+      if (!session && !isLoginScreen) {
+        router.replace("/Login");
+      } 
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [segments]);
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <Stack>
+      <Stack.Screen 
+        name="Profile" 
+        options={{ 
+          title: "Profile",
+          headerShown: true,
+        }} 
+      />
+      <Stack.Screen 
+        name="Login" 
+        options={{ 
+          title: "Login",
+          headerShown: false,
+        }} 
+      />
+      <Stack.Screen 
+        name="index" 
+        options={{ 
+          title: "Step With Friends",
+          headerShown: true,
+        }} 
+      />
+    </Stack>
   );
 }
